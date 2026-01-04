@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Marketplace</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">MarketPlace</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link active"><i class="fas fa-home"></i> Home</a>
+                <a href="products.html" class="nav-link"><i class="fas fa-box"></i> Products</a>
+                <a href="#post" class="nav-link"><i class="fas fa-plus-circle"></i> Post Product</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="hero">
+            <h1>Welcome to Product Marketplace</h1>
+            <p>Buy and sell amazing products. Join our community today!</p>
+            <a href="#post" class="cta-button">Post Your Product</a>
+        </header>
+
+        <section id="post" class="post-section">
+            <h2>Post a New Product</h2>
+            <div class="form-container">
+                <form id="productForm">
+                    <div class="form-group">
+                        <label for="name"><i class="fas fa-tag"></i> Product Name</label>
+                        <input type="text" id="name" required placeholder="Enter product name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description"><i class="fas fa-align-left"></i> Description</label>
+                        <textarea id="description" required rows="4" placeholder="Describe your product"></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="price"><i class="fas fa-dollar-sign"></i> Price ($)</label>
+                            <input type="number" id="price" required step="0.01" placeholder="0.00">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="category"><i class="fas fa-filter"></i> Category</label>
+                            <select id="category" required>
+                                <option value="">Select category</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="clothing">Clothing</option>
+                                <option value="books">Books</option>
+                                <option value="home">Home & Garden</option>
+                                <option value="sports">Sports</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="image"><i class="fas fa-image"></i> Image URL</label>
+                        <input type="url" id="image" placeholder="https://example.com/image.jpg">
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-paper-plane"></i> Post Product
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <section class="products-preview">
+            <h2>Recent Products</h2>
+            <div id="productsContainer" class="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+            <a href="products.html" class="view-all">View All Products <i class="fas fa-arrow-right"></i></a>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Product Marketplace. All rights reserved.</p>
+    </footer>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

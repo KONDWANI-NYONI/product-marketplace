@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Products | Marketplace</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo">MarketPlace</a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="products.html" class="nav-link active"><i class="fas fa-box"></i> Products</a>
+                <a href="index.html#post" class="nav-link"><i class="fas fa-plus-circle"></i> Post Product</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="hero" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);">
+            <h1>Browse Products</h1>
+            <p>Discover amazing products from our community</p>
+        </header>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="categoryFilter"><i class="fas fa-filter"></i> Filter by Category:</label>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="electronics">Electronics</option>
+                    <option value="clothing">Clothing</option>
+                    <option value="books">Books</option>
+                    <option value="home">Home & Garden</option>
+                    <option value="sports">Sports</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="sortFilter"><i class="fas fa-sort"></i> Sort by:</label>
+                <select id="sortFilter">
+                    <option value="newest">Newest First</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                </select>
+            </div>
+        </div>
+
+        <section class="products-section">
+            <h2 id="productsCount">Loading products...</h2>
+            <div id="productsGrid" class="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+            <div id="loading" class="loading">
+                <i class="fas fa-spinner fa-spin"></i> Loading more products...
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Product Marketplace. All rights reserved.</p>
+    </footer>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
