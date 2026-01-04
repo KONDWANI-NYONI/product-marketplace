@@ -110,6 +110,28 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
+// Get single product by ID
+app.get('/api/products/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`📥 GET /api/products/${id}`);
+        
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('❌ Error fetching product:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch product',
+            message: error.message 
+        });
+    }
+});
+
 // Create new product
 app.post('/api/products', async (req, res) => {
     console.log('📥 POST /api/products body:', req.body);
@@ -142,13 +164,70 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
+// UPDATE product by ID
+app.put('/api/products/:id', async (req, res) => {
+    console.log(`📥 PUT /api/products/${req.params.id} body:`, req.body);
+    
+    try {
+        const { id } = req.params;
+        const { name, description, price, category, image } = req.body;
+        
+        const result = await pool.query(
+            'UPDATE products SET name = $1, description = $2, price = $3, category = $4, image_url = $5 WHERE id = $6 RETURNING *',
+            [name, description, price, category, image, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        
+        console.log('✅ Product updated:', id);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('❌ Error updating product:', error);
+        res.status(500).json({ 
+            error: 'Failed to update product',
+            message: error.message 
+        });
+    }
+});
+
+// DELETE product by ID
+app.delete('/api/products/:id', async (req, res) => {
+    console.log(`📥 DELETE /api/products/${req.params.id}`);
+    
+    try {
+        const { id } = req.params;
+        
+        const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+        
+        console.log('✅ Product deleted:', id);
+        res.json({ 
+            success: true, 
+            message: 'Product deleted successfully',
+            deletedProduct: result.rows[0]
+        });
+    } catch (error) {
+        console.error('❌ Error deleting product:', error);
+        res.status(500).json({ 
+            error: 'Failed to delete product',
+            message: error.message 
+        });
+    }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
         service: 'Product Marketplace API',
-        database: 'Connected'
+        database: 'Connected',
+        features: ['GET', 'POST', 'PUT', 'DELETE']
     });
 });
 
@@ -173,4 +252,5 @@ app.listen(port, () => {
     console.log(`🔗 Health check: http://localhost:${port}/health`);
     console.log(`🔗 Products API: http://localhost:${port}/api/products`);
     console.log(`🌐 Frontend: http://localhost:${port}`);
+    console.log(`🗑️  DELETE endpoint: http://localhost:${port}/api/products/:id`);
 });

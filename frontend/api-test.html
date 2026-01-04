@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    
+    <div>
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <button onclick="testProducts()">Test Products API</button>
+        <button onclick="testPost()">Test POST Product</button>
+    </div>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+    const API_URL = 'https://product-marketplace-api.onrender.com';
+    
+    async function testHealth() {
+        try {
+            const response = await fetch(API_URL + '/health');
+            const data = await response.json();
+            showResult('Health Check', data, response.ok);
+        } catch (error) {
+            showResult('Health Check', {error: error.message}, false);
+        }
+    }
+    
+    async function testProducts() {
+        try {
+            const response = await fetch(API_URL + '/api/products');
+            const data = await response.json();
+            showResult('Products API', {
+                count: data.length,
+                sample: data.slice(0, 2)
+            }, response.ok);
+        } catch (error) {
+            showResult('Products API', {error: error.message}, false);
+        }
+    }
+    
+    async function testPost() {
+        const testProduct = {
+            name: "Test Product " + Date.now(),
+            description: "Test from API test page",
+            price: 19.99,
+            category: "test"
+        };
+        
+        try {
+            const response = await fetch(API_URL + '/api/products', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(testProduct)
+            });
+            
+            const data = await response.json();
+            showResult('POST Product', data, response.ok);
+        } catch (error) {
+            showResult('POST Product', {error: error.message}, false);
+        }
+    }
+    
+    function showResult(title, data, success) {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = `
+            <h3 class="${success ? 'success' : 'error'}">${title}: ${success ? 'SUCCESS' : 'FAILED'}</h3>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+        `;
+    }
+    </script>
+</body>
+</html>

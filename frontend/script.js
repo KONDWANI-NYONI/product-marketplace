@@ -321,3 +321,61 @@ async function testAPI() {
 window.loadProducts = loadProducts;
 window.loadFilteredProducts = loadFilteredProducts;
 window.testAPI = testAPI;
+
+// Delete all products (Dangerous!)
+async function deleteAllProducts() {
+    if (!confirm('⚠️ DANGER: This will delete ALL products!\n\nThis action cannot be undone!\n\nAre you absolutely sure?')) {
+        return;
+    }
+    
+    const btn = document.getElementById('deleteAllBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting all...';
+    btn.disabled = true;
+    
+    try {
+        // Get all products first
+        const response = await fetch(`${API_BASE_URL}/api/products`);
+        const products = await response.json();
+        
+        if (products.length === 0) {
+            showNotification('No products to delete', 'warning');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            return;
+        }
+        
+        // Delete each product
+        let deletedCount = 0;
+        for (const product of products) {
+            try {
+                await fetch(`${API_BASE_URL}/api/products/${product.id}`, {
+                    method: 'DELETE'
+                });
+                deletedCount++;
+                console.log(`Deleted product ${product.id}: ${product.name}`);
+            } catch (error) {
+                console.error(`Failed to delete product ${product.id}:`, error);
+            }
+        }
+        
+        showNotification(`Deleted ${deletedCount} products successfully!`, 'success');
+        
+        // Reload products
+        setTimeout(() => {
+            if (window.location.pathname === '/' || window.location.pathname.includes('index.html')) {
+                loadProducts();
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error deleting all products:', error);
+        showNotification('Failed to delete all products', 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+// Make it available globally
+window.deleteAllProducts = deleteAllProducts;
