@@ -6,13 +6,26 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Middleware
-app.use(cors());
+// Configure CORS to allow all origins
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
+// Log all requests
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+});
+
+// Serve static files from frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Database connection
-const databaseUrl = 'postgresql://product_user:w92oa8qNUWqtnX91Bu2mMvG7DFuV97a0@dpg-d5d9tjuuk2gs738ruh40-a.virginia-postgres.render.com/product_marketplace';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://product_user:w92oa8qNUWqtnX91Bu2mMvG7DFuV97a0@dpg-d5d9tjuuk2gs738ruh40-a.virginia-postgres.render.com/product_marketplace';
 
 const pool = new Pool({
     connectionString: databaseUrl,
@@ -22,12 +35,12 @@ const pool = new Pool({
 console.log('✅ Database pool created');
 
 // Test database connection
-const initializeDatabase = async () => {
+const testConnection = async () => {
     try {
         const client = await pool.connect();
-        console.log('✅ Connected to PostgreSQL');
+        console.log('✅ Connected to PostgreSQL database');
         
-        // Create table if not exists
+        // Create table if it doesn't exist
         await client.query(`
             CREATE TABLE IF NOT EXISTS products (
                 id SERIAL PRIMARY KEY,
@@ -39,20 +52,25 @@ const initializeDatabase = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log('✅ Products table ready');
+        console.log('✅ Products table is ready');
         
         client.release();
     } catch (error) {
-        console.error('❌ Database error:', error.message);
+        console.error('❌ Database connection error:', error.message);
     }
 };
 
-initializeDatabase();
+testConnection();
 
 // API Routes
+
+// Get all products
 app.get('/api/products', async (req, res) => {
     try {
+        console.log('📥 GET /api/products query:', req.query);
+        
         const { category, sort = 'newest', limit } = req.query;
+        
         let query = 'SELECT * FROM products';
         const params = [];
         
@@ -61,29 +79,50 @@ app.get('/api/products', async (req, res) => {
             params.push(category);
         }
         
-        if (sort === 'price_low') query += ' ORDER BY price ASC';
-        else if (sort === 'price_high') query += ' ORDER BY price DESC';
-        else query += ' ORDER BY created_at DESC';
+        // Sorting
+        switch (sort) {
+            case 'price_low':
+                query += ' ORDER BY price ASC';
+                break;
+            case 'price_high':
+                query += ' ORDER BY price DESC';
+                break;
+            default:
+                query += ' ORDER BY created_at DESC';
+        }
         
+        // Limiting
         if (limit) {
             query += ' LIMIT $' + (params.length + 1);
             params.push(parseInt(limit));
         }
         
         const result = await pool.query(query, params);
+        console.log(`✅ Returning ${result.rows.length} products`);
+        
         res.json(result.rows);
     } catch (error) {
-        console.error('GET /api/products error:', error);
-        res.status(500).json({ error: 'Failed to fetch products' });
+        console.error('❌ Error fetching products:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch products',
+            message: error.message 
+        });
     }
 });
 
+// Create new product
 app.post('/api/products', async (req, res) => {
+    console.log('📥 POST /api/products body:', req.body);
+    
     try {
         const { name, description, price, category, image } = req.body;
         
+        // Validation
         if (!name || !description || !price || !category) {
-            return res.status(400).json({ error: 'Missing required fields' });
+            return res.status(400).json({ 
+                error: 'Missing required fields',
+                required: ['name', 'description', 'price', 'category']
+            });
         }
         
         const result = await pool.query(
@@ -91,22 +130,39 @@ app.post('/api/products', async (req, res) => {
             [name, description, parseFloat(price), category, image || null]
         );
         
+        console.log('✅ Product created with ID:', result.rows[0].id);
+        
         res.status(201).json(result.rows[0]);
     } catch (error) {
-        console.error('POST /api/products error:', error);
-        res.status(500).json({ error: 'Failed to create product' });
+        console.error('❌ Error creating product:', error);
+        res.status(500).json({ 
+            error: 'Failed to create product',
+            message: error.message 
+        });
     }
 });
 
+// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        service: 'Product Marketplace API'
+        service: 'Product Marketplace API',
+        database: 'Connected'
     });
 });
 
-// Serve frontend
+// Debug endpoint
+app.get('/api/debug', (req, res) => {
+    res.json({
+        message: 'API is working',
+        headers: req.headers,
+        query: req.query,
+        time: new Date().toISOString()
+    });
+});
+
+// Serve frontend for all other routes
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
@@ -114,15 +170,7 @@ app.get('*', (req, res) => {
 // Start server
 app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
-    console.log(`🌐 Health check: http://localhost:${port}/health`);
-    console.log(`🛒 Products API: http://localhost:${port}/api/products`);
-});
-
-// Handle errors
-process.on('unhandledRejection', (error) => {
-    console.error('Unhandled promise rejection:', error);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
+    console.log(`🔗 Health check: http://localhost:${port}/health`);
+    console.log(`🔗 Products API: http://localhost:${port}/api/products`);
+    console.log(`🌐 Frontend: http://localhost:${port}`);
 });
