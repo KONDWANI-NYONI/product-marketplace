@@ -6,11 +6,14 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 10000;
 
+// Admin token (in production, use environment variable)
+const ADMIN_TOKEN = 'admin-secret-token-123';
+
 // Configure CORS to allow all origins
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token']
 }));
 
 app.use(express.json());
@@ -20,6 +23,22 @@ app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
     next();
 });
+
+// Admin middleware
+const requireAdmin = (req, res, next) => {
+    const token = req.headers['x-admin-token'] || req.query.admin_token;
+    
+    if (token === ADMIN_TOKEN) {
+        console.log('✅ Admin access granted');
+        next();
+    } else {
+        console.log('❌ Admin access denied');
+        res.status(403).json({ 
+            error: 'Admin access required',
+            message: 'Valid admin token is required for this operation'
+        });
+    }
+};
 
 // Serve static files from frontend
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -64,7 +83,7 @@ testConnection();
 
 // API Routes
 
-// Get all products
+// Get all products (public)
 app.get('/api/products', async (req, res) => {
     try {
         console.log('📥 GET /api/products query:', req.query);
@@ -110,7 +129,7 @@ app.get('/api/products', async (req, res) => {
     }
 });
 
-// Get single product by ID
+// Get single product by ID (public)
 app.get('/api/products/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -132,7 +151,7 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-// Create new product
+// Create new product (public - anyone can post)
 app.post('/api/products', async (req, res) => {
     console.log('📥 POST /api/products body:', req.body);
     
@@ -164,8 +183,8 @@ app.post('/api/products', async (req, res) => {
     }
 });
 
-// UPDATE product by ID
-app.put('/api/products/:id', async (req, res) => {
+// UPDATE product by ID (admin only)
+app.put('/api/products/:id', requireAdmin, async (req, res) => {
     console.log(`📥 PUT /api/products/${req.params.id} body:`, req.body);
     
     try {
@@ -192,8 +211,8 @@ app.put('/api/products/:id', async (req, res) => {
     }
 });
 
-// DELETE product by ID
-app.delete('/api/products/:id', async (req, res) => {
+// DELETE product by ID (admin only)
+app.delete('/api/products/:id', requireAdmin, async (req, res) => {
     console.log(`📥 DELETE /api/products/${req.params.id}`);
     
     try {
@@ -227,8 +246,27 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         service: 'Product Marketplace API',
         database: 'Connected',
-        features: ['GET', 'POST', 'PUT', 'DELETE']
+        features: ['GET (public)', 'POST (public)', 'PUT (admin)', 'DELETE (admin)']
     });
+});
+
+// Admin login endpoint (for frontend to get token)
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    
+    // In production, use proper password hashing
+    if (password === 'admin123') {
+        res.json({
+            success: true,
+            token: ADMIN_TOKEN,
+            message: 'Admin login successful'
+        });
+    } else {
+        res.status(401).json({
+            success: false,
+            error: 'Invalid credentials'
+        });
+    }
 });
 
 // Debug endpoint
@@ -252,5 +290,5 @@ app.listen(port, () => {
     console.log(`🔗 Health check: http://localhost:${port}/health`);
     console.log(`🔗 Products API: http://localhost:${port}/api/products`);
     console.log(`🌐 Frontend: http://localhost:${port}`);
-    console.log(`🗑️  DELETE endpoint: http://localhost:${port}/api/products/:id`);
+    console.log(`🔐 Admin token: ${ADMIN_TOKEN}`);
 });
