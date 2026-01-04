@@ -1,9 +1,13 @@
 // API Configuration
-const API_BASE_URL = window.location.origin; // This automatically uses the current website URL
+const API_BASE_URL = window.location.origin;
+
+// FOR TESTING: Make admin always true
+let isAdmin = true; // Changed to true for testing
 
 console.log('🚀 Starting Product Marketplace');
 console.log('🌐 Current URL:', window.location.href);
 console.log('🔗 API Base URL:', API_BASE_URL);
+console.log('👑 Admin mode:', isAdmin ? 'ENABLED' : 'DISABLED');
 
 // Show notification
 function showNotification(message, type = 'success') {
@@ -21,7 +25,7 @@ function showNotification(message, type = 'success') {
     }, 4000);
 }
 
-// Simple function to load and display products
+// Load products for homepage
 async function loadProducts(limit = 6) {
     console.log('🔄 Loading products...');
     
@@ -37,18 +41,11 @@ async function loadProducts(limit = 6) {
     try {
         console.log(`📡 Fetching from: ${API_BASE_URL}/api/products`);
         
-        // Simple fetch with timeout
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        
         const response = await fetch(`${API_BASE_URL}/api/products?limit=${limit}`, {
-            signal: controller.signal,
             headers: {
                 'Accept': 'application/json'
             }
         });
-        
-        clearTimeout(timeout);
         
         console.log('📊 Response status:', response.status);
         
@@ -64,26 +61,15 @@ async function loadProducts(limit = 6) {
             return;
         }
         
-        // Display products
+        // Display products with delete buttons
         displayProducts(products);
         
     } catch (error) {
         console.error('❌ Error loading products:', error);
         
-        // Show user-friendly error
-        let errorMessage = 'Could not load products. ';
-        
-        if (error.name === 'AbortError') {
-            errorMessage += 'Request timed out. The server might be starting up.';
-        } else if (error.message.includes('Failed to fetch')) {
-            errorMessage += 'Network error. Please check your connection.';
-        } else {
-            errorMessage += error.message;
-        }
-        
         container.innerHTML = `
             <div class="error-message">
-                <p>${errorMessage}</p>
+                <p>Could not load products: ${error.message}</p>
                 <button onclick="loadProducts()" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
                     Try Again
                 </button>
@@ -94,16 +80,27 @@ async function loadProducts(limit = 6) {
     }
 }
 
-// Display products in the grid
+// Display products WITH delete buttons
 function displayProducts(products, containerId = 'productsContainer') {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+        console.error('Container not found:', containerId);
+        return;
+    }
     
     container.innerHTML = '';
+    
+    if (!products || products.length === 0) {
+        container.innerHTML = '<p class="no-products">No products found</p>';
+        return;
+    }
+    
+    console.log(`🖼️ Displaying ${products.length} products with delete buttons`);
     
     products.forEach(product => {
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
+        productCard.dataset.id = product.id;
         
         // Use image_url from database (not image)
         const imageUrl = product.image_url || product.image || 'https://via.placeholder.com/400x300?text=No+Image';
@@ -118,11 +115,68 @@ function displayProducts(products, containerId = 'productsContainer') {
                 <p class="product-description">${product.description}</p>
                 <div class="product-price">$${parseFloat(product.price).toFixed(2)}</div>
                 <span class="product-category">${product.category}</span>
+                <div class="product-actions">
+                    <button class="delete-btn" onclick="deleteProduct(${product.id}, '${product.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
         `;
         
         container.appendChild(productCard);
     });
+}
+
+// Delete product function
+async function deleteProduct(productId, productName) {
+    console.log(`🗑️  Deleting product ${productId}: ${productName}`);
+    
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${productName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('DELETE Response status:', response.status);
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log('✅ Product deleted:', result);
+            
+            showNotification(`Product "${productName}" deleted successfully!`, 'success');
+            
+            // Remove the product card from the DOM
+            const productCard = document.querySelector(`.product-card[data-id="${productId}"]`);
+            if (productCard) {
+                productCard.style.opacity = '0.5';
+                productCard.style.transition = 'opacity 0.3s';
+                setTimeout(() => productCard.remove(), 300);
+            }
+            
+            // Reload products after 1 second
+            setTimeout(() => {
+                if (window.location.pathname === '/' || window.location.pathname.includes('index.html')) {
+                    loadProducts();
+                }
+            }, 1000);
+            
+        } else {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Failed to delete: ${response.status}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error deleting product:', error);
+        showNotification(`Failed to delete product: ${error.message}`, 'error');
+    }
 }
 
 // Handle product form submission
@@ -218,164 +272,28 @@ document.addEventListener('DOMContentLoaded', function() {
         loadProducts(6);
     }
     
-    // Setup filter change listeners for products page
-    const categoryFilter = document.getElementById('categoryFilter');
-    const sortFilter = document.getElementById('sortFilter');
-    
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', loadFilteredProducts);
+    // Add admin indicator since we're in admin mode
+    if (isAdmin) {
+        const adminIndicator = document.createElement('div');
+        adminIndicator.id = 'adminIndicator';
+        adminIndicator.innerHTML = '👑 Admin Mode (Delete Enabled)';
+        adminIndicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        `;
+        document.body.appendChild(adminIndicator);
     }
-    
-    if (sortFilter) {
-        sortFilter.addEventListener('change', loadFilteredProducts);
-    }
-    
-    // Add a refresh button for debugging
-    addDebugTools();
 });
-
-// Function for filtered loading (used on products.html)
-async function loadFilteredProducts() {
-    try {
-        const category = document.getElementById('categoryFilter')?.value || '';
-        const sort = document.getElementById('sortFilter')?.value || 'newest';
-        
-        let url = `${API_BASE_URL}/api/products`;
-        const params = new URLSearchParams();
-        
-        if (category) params.append('category', category);
-        if (sort) params.append('sort', sort);
-        
-        if (params.toString()) {
-            url += `?${params.toString()}`;
-        }
-        
-        console.log('Filter URL:', url);
-        
-        const response = await fetch(url);
-        const products = await response.json();
-        
-        displayProducts(products, 'productsGrid');
-        
-        // Update count
-        const countElement = document.getElementById('productsCount');
-        if (countElement) {
-            countElement.textContent = `Found ${products.length} products`;
-        }
-        
-    } catch (error) {
-        console.error('Filter error:', error);
-        showNotification('Failed to filter products', 'error');
-    }
-}
-
-// Add debug tools to page
-function addDebugTools() {
-    const debugDiv = document.createElement('div');
-    debugDiv.style.cssText = `
-        position: fixed;
-        bottom: 10px;
-        right: 10px;
-        z-index: 9999;
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        font-size: 12px;
-        font-family: monospace;
-    `;
-    
-    debugDiv.innerHTML = `
-        <div>API: <span id="apiStatus">Checking...</span></div>
-        <button onclick="testAPI()" style="margin-top: 5px; padding: 3px 6px; font-size: 10px;">Test Connection</button>
-        <button onclick="console.clear(); console.log('Console cleared')" style="margin-top: 5px; padding: 3px 6px; font-size: 10px; margin-left: 5px;">Clear Console</button>
-    `;
-    
-    document.body.appendChild(debugDiv);
-    
-    // Test API connection
-    setTimeout(() => {
-        testAPI();
-    }, 1000);
-}
-
-// Test API connection
-async function testAPI() {
-    const statusEl = document.getElementById('apiStatus');
-    if (!statusEl) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        const data = await response.json();
-        statusEl.textContent = '✅ Connected';
-        statusEl.style.color = 'lightgreen';
-        console.log('API Health:', data);
-    } catch (error) {
-        statusEl.textContent = '❌ Error';
-        statusEl.style.color = 'red';
-        console.error('API Test failed:', error);
-    }
-}
 
 // Make functions available globally
 window.loadProducts = loadProducts;
-window.loadFilteredProducts = loadFilteredProducts;
-window.testAPI = testAPI;
-
-// Delete all products (Dangerous!)
-async function deleteAllProducts() {
-    if (!confirm('⚠️ DANGER: This will delete ALL products!\n\nThis action cannot be undone!\n\nAre you absolutely sure?')) {
-        return;
-    }
-    
-    const btn = document.getElementById('deleteAllBtn');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting all...';
-    btn.disabled = true;
-    
-    try {
-        // Get all products first
-        const response = await fetch(`${API_BASE_URL}/api/products`);
-        const products = await response.json();
-        
-        if (products.length === 0) {
-            showNotification('No products to delete', 'warning');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            return;
-        }
-        
-        // Delete each product
-        let deletedCount = 0;
-        for (const product of products) {
-            try {
-                await fetch(`${API_BASE_URL}/api/products/${product.id}`, {
-                    method: 'DELETE'
-                });
-                deletedCount++;
-                console.log(`Deleted product ${product.id}: ${product.name}`);
-            } catch (error) {
-                console.error(`Failed to delete product ${product.id}:`, error);
-            }
-        }
-        
-        showNotification(`Deleted ${deletedCount} products successfully!`, 'success');
-        
-        // Reload products
-        setTimeout(() => {
-            if (window.location.pathname === '/' || window.location.pathname.includes('index.html')) {
-                loadProducts();
-            }
-        }, 1000);
-        
-    } catch (error) {
-        console.error('Error deleting all products:', error);
-        showNotification('Failed to delete all products', 'error');
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-}
-
-// Make it available globally
-window.deleteAllProducts = deleteAllProducts;
+window.deleteProduct = deleteProduct;
