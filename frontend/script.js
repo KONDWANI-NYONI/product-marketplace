@@ -1,37 +1,133 @@
-// API Configuration
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? 'http://localhost:3000' 
-    : 'https://your-backend-url.onrender.com'; // Update with your Render backend URL
+// API Configuration - Use absolute URL
+const API_BASE_URL = 'https://product-marketplace-api.onrender.com';
+
+console.log('🚀 Starting application...');
+console.log('🌐 API Base URL:', API_BASE_URL);
+
+// Test API connection on load
+async function testConnection() {
+    try {
+        console.log('🔌 Testing API connection...');
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ API Connection OK:', data);
+            return true;
+        } else {
+            console.error('❌ API Connection failed:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ API Connection error:', error);
+        return false;
+    }
+}
 
 // Show notification
 function showNotification(message, type = 'success') {
     const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.className = `notification ${type}`;
-    
-    setTimeout(() => {
-        notification.className = 'notification';
-    }, 3000);
+    if (notification) {
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+        
+        setTimeout(() => {
+            notification.className = 'notification';
+        }, 5000);
+    }
 }
 
 // Load products for homepage
 async function loadProducts(limit = 6) {
+    console.log('🔄 Loading products...');
+    
+    // First test connection
+    const connected = await testConnection();
+    if (!connected) {
+        showNotification('Cannot connect to server. Please try again later.', 'error');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/api/products?limit=${limit}`);
-        if (!response.ok) throw new Error('Failed to load products');
+        console.log(`📡 Fetching: ${API_BASE_URL}/api/products?limit=${limit}`);
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(`${API_BASE_URL}/api/products?limit=${limit}`, {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log('📊 Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            let errorMsg = `Server error: ${response.status} ${response.statusText}`;
+            try {
+                const errorData = await response.json();
+                errorMsg = errorData.error || errorMsg;
+            } catch (e) {
+                // Couldn't parse JSON error
+            }
+            throw new Error(errorMsg);
+        }
         
         const products = await response.json();
+        console.log(`✅ Success! Loaded ${products.length} products`);
         displayProducts(products);
+        
     } catch (error) {
-        console.error('Error loading products:', error);
-        showNotification('Failed to load products', 'error');
+        console.error('❌ Error loading products:', error);
+        
+        let errorMessage = 'Failed to load products. ';
+        if (error.name === 'AbortError') {
+            errorMessage += 'Request timed out.';
+        } else if (error.message.includes('Failed to fetch')) {
+            errorMessage += 'Network error. Check your connection.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        showNotification(errorMessage, 'error');
+        
+        // Show sample products if API fails
+        displaySampleProducts();
     }
+}
+
+// Display sample products (fallback)
+function displaySampleProducts() {
+    const container = document.getElementById('productsContainer');
+    if (!container) return;
+    
+    const sampleProducts = [
+        {
+            name: "Sample Headphones",
+            description: "Wireless Bluetooth headphones",
+            price: 99.99,
+            category: "electronics",
+            image_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop"
+        },
+        {
+            name: "Sample Book",
+            description: "Programming guide",
+            price: 49.99,
+            category: "books",
+            image_url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=300&fit=crop"
+        }
+    ];
+    
+    displayProducts(sampleProducts);
 }
 
 // Display products
 function displayProducts(products, containerId = 'productsContainer') {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+        console.error('❌ Container not found:', containerId);
+        return;
+    }
     
     container.innerHTML = '';
     
@@ -40,15 +136,17 @@ function displayProducts(products, containerId = 'productsContainer') {
         return;
     }
     
+    console.log(`🖼️ Displaying ${products.length} products`);
+    
     products.forEach(product => {
         const productCard = document.createElement('div');
         productCard.className = 'product-card';
         
         productCard.innerHTML = `
-            <img src="${product.image || 'https://via.placeholder.com/400x300?text=No+Image'}" 
+            <img src="${product.image_url || 'https://via.placeholder.com/400x300?text=No+Image'}" 
                  alt="${product.name}" 
                  class="product-image"
-                 onerror="this.src='https://via.placeholder.com/400x300?text=No+Image'">
+                 onerror="this.onerror=null; this.src='https://via.placeholder.com/400x300?text=Image+Error'">
             <div class="product-content">
                 <h3 class="product-title">${product.name}</h3>
                 <p class="product-description">${product.description}</p>
@@ -63,22 +161,34 @@ function displayProducts(products, containerId = 'productsContainer') {
 
 // Handle product form submission
 document.addEventListener('DOMContentLoaded', () => {
-    const productForm = document.getElementById('productForm');
-    const categoryFilter = document.getElementById('categoryFilter');
-    const sortFilter = document.getElementById('sortFilter');
+    console.log('📝 DOM loaded');
     
-    // Handle new product submission
+    const productForm = document.getElementById('productForm');
+    
     if (productForm) {
+        console.log('✅ Form found, adding event listener');
+        
         productForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            console.log('📤 Form submitted');
             
             const product = {
-                name: document.getElementById('name').value,
-                description: document.getElementById('description').value,
+                name: document.getElementById('name').value.trim(),
+                description: document.getElementById('description').value.trim(),
                 price: parseFloat(document.getElementById('price').value),
                 category: document.getElementById('category').value,
-                image: document.getElementById('image').value || null
+                image: document.getElementById('image').value.trim() || null
             };
+            
+            console.log('Product data:', product);
+            
+            // Validate
+            if (!product.name || !product.description || !product.price || !product.category) {
+                showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            showNotification('Posting product...', 'success');
             
             try {
                 const response = await fetch(`${API_BASE_URL}/api/products`, {
@@ -89,74 +199,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(product)
                 });
                 
+                console.log('POST Response:', response.status);
+                
                 if (response.ok) {
-                    showNotification('Product posted successfully!');
+                    const result = await response.json();
+                    console.log('✅ Product created:', result);
+                    showNotification('Product posted successfully!', 'success');
                     productForm.reset();
                     
-                    // Reload products on homepage
-                    if (window.location.pathname === '/' || window.location.pathname.includes('index.html')) {
-                        loadProducts();
-                    }
+                    // Reload products after 1 second
+                    setTimeout(() => loadProducts(), 1000);
                 } else {
-                    throw new Error('Failed to post product');
+                    const errorText = await response.text();
+                    console.error('Server error:', errorText);
+                    throw new Error(`Server returned ${response.status}: ${errorText}`);
                 }
             } catch (error) {
-                console.error('Error posting product:', error);
-                showNotification('Failed to post product', 'error');
+                console.error('❌ Error posting product:', error);
+                showNotification(`Failed to post product: ${error.message}`, 'error');
             }
         });
-    }
-    
-    // Handle product filtering
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', loadFilteredProducts);
-    }
-    
-    if (sortFilter) {
-        sortFilter.addEventListener('change', loadFilteredProducts);
+    } else {
+        console.error('❌ Form element not found!');
     }
     
     // Initial load
-    if (window.location.pathname === '/' || window.location.pathname.includes('index.html')) {
-        loadProducts(6);
-    } else if (window.location.pathname.includes('products.html')) {
-        loadAllProducts();
-    }
+    console.log('🚀 Starting initial product load...');
+    loadProducts(6);
 });
 
-// Load all products with filters
-async function loadAllProducts() {
-    try {
-        const category = document.getElementById('categoryFilter')?.value || '';
-        const sort = document.getElementById('sortFilter')?.value || 'newest';
-        
-        let url = `${API_BASE_URL}/api/products`;
-        const params = new URLSearchParams();
-        
-        if (category) params.append('category', category);
-        if (sort) params.append('sort', sort);
-        
-        if (params.toString()) {
-            url += `?${params.toString()}`;
-        }
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Failed to load products');
-        
-        const products = await response.json();
-        
-        // Update product count
-        const countElement = document.getElementById('productsCount');
-        if (countElement) {
-            countElement.textContent = `Found ${products.length} products`;
-        }
-        
-        displayProducts(products, 'productsGrid');
-    } catch (error) {
-        console.error('Error loading products:', error);
-        showNotification('Failed to load products', 'error');
-    }
-}
-
-// Export functions for global use
-window.loadFilteredProducts = loadAllProducts;
+// Export for global use
+window.loadProducts = loadProducts;
